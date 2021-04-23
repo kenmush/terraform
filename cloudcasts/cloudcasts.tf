@@ -77,38 +77,39 @@ data "aws_ami" "app" {
   most_recent = true
 }
 
-resource "aws_instance" "cloudcasts_web" {
-  ami = data.aws_ami.app.id
-  instance_type = var.instance_size
-  root_block_device {
-    volume_size = 8
-    #GB
-    volume_type = "gp3"
-  }
+module "ec2_app" {
+  source = "./modules/ec2"
+  infra_env = var.infra_env
+  infra_role = "web"
+  instance_size = var.instance_size
+  instance_ami = data.aws_ami.app.id
   tags = {
-    Name = "cloudcasts.${var.infra_env}.io"
-    Project = "cloudcasts.io"
-    Enviroment = var.infra_env
-    ManagedBy = "terraform"
+    "Name" = "cloudcasts.${var.infra_env}-app"
   }
-}
-resource "aws_eip" "app_eip" {
-  vpc = true
-  lifecycle {
-    #might bite you in the ass sometimes
-    prevent_destroy = true
-  }
-  tags = {
-    Name = "cloudcasts-${var.infra_env}-web-address"
-    Project = "cloudcasts.io"
-    Enviroment = var.infra_env
-    ManagedBy = "terraform"
-  }
+  //  instance_root_device_size = "12"
+  security_groups = [module.vpc.security_group_public]
+  subnets = keys(module.vpc.vpc_public_subnets)
+  create_eip = true
 }
 
-resource "aws_eip_association" "app_eip_assoc" {
-  instance_id = aws_instance.cloudcasts_web.id
+module "ec2_worker" {
+  source = "./modules/ec2"
+  infra_env = var.infra_env
+  infra_role = "worker"
+  instance_size = var.instance_size
+  instance_ami = data.aws_ami.app.id
+  //  instance_root_device_size = "12"
+  security_groups = [module.vpc.security_group_private]
+  tags = {
+    "Name" = "cloudcasts.${var.infra_env}-worker"
+  }
+  subnets = keys(module.vpc.vpc_private_subnets)
+create_eip = false
+}
 
-  allocation_id = aws_eip.app_eip.id
-
+module "vpc" {
+  source = "./modules/vpc"
+  infra_env = var.infra_env
+  //  vpc_cidr = "10.0.0.0/17"
+  vpc_cidr = "10.0.0.0/16"
 }
