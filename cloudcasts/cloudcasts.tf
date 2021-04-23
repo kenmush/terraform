@@ -1,15 +1,37 @@
 terraform {
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
+      source = "hashicorp/aws"
       version = "3.37.0"
     }
   }
+  backend "s3" {
+    bucket = "terraform-mutisya"
+    key = "cloudcasts/terraform.tfstaste"
+    profile = "cloudcasts"
+    region = "us-east-1"
+    dynamodb_table = "cloudcasts"
+  }
+
 }
 
+variable "infra_env" {
+  type = string
+  description = "infrastructure enviroment"
+  default = "staging"
+}
+variable "default_region" {
+  type = string
+  description = "the region the infrastructure region"
+  default = "us-east-1"
+}
+variable "instance_size" {
+  type = string
+  default = "t3.small"
+}
 provider "aws" {
   profile = "cloudcasts"
-  region  = "us-east-1"
+  region = var.default_region
 }
 
 //data "aws_ami" "app" { # Search for ubuntu
@@ -34,40 +56,40 @@ provider "aws" {
 //}
 data "aws_ami" "app" {
   owners = [
-  "self"]
+    "self"]
   filter {
     name = "state"
     values = [
-    "available"]
+      "available"]
   }
 
   filter {
     name = "tag:Project"
     values = [
-    "cloudcast"]
+      "cloudcast"]
   }
 
   filter {
     name = "tag:Enviroment"
     values = [
-    "staging"]
+      var.infra_env]
   }
   most_recent = true
 }
 
 resource "aws_instance" "cloudcasts_web" {
-  ami           = data.aws_ami.app.id
-  instance_type = "t3.small"
+  ami = data.aws_ami.app.id
+  instance_type = var.instance_size
   root_block_device {
     volume_size = 8
     #GB
     volume_type = "gp3"
   }
   tags = {
-    Name       = "cloudcasts.staging.io"
-    Project    = "cloudcasts.io"
-    Enviroment = "staging"
-    ManagedBy  = "terraform"
+    Name = "cloudcasts.${var.infra_env}.io"
+    Project = "cloudcasts.io"
+    Enviroment = var.infra_env
+    ManagedBy = "terraform"
   }
 }
 resource "aws_eip" "app_eip" {
@@ -77,10 +99,10 @@ resource "aws_eip" "app_eip" {
     prevent_destroy = true
   }
   tags = {
-    Name       = "cloudcasts-staging-web-address"
-    Project    = "cloudcasts.io"
-    Enviroment = "staging"
-    ManagedBy  = "terraform"
+    Name = "cloudcasts-${var.infra_env}-web-address"
+    Project = "cloudcasts.io"
+    Enviroment = var.infra_env
+    ManagedBy = "terraform"
   }
 }
 
